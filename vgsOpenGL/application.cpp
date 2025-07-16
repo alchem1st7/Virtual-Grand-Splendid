@@ -196,12 +196,123 @@ void LoadFolder() {
 
 namespace App
 {
+	static bool showLoadWindow = true;
+	static bool showImageWindow = false;
+
 	void RenderUI() {
-		bool opened = true;
-		ImGui::Begin("Load folder", &opened, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking);
-		if (ImGui::Button("Load", ImVec2(600, 400))) {
-			LoadFolder();
+		// Main controller - this is what gets called from your main loop
+		if (showLoadWindow) {
+			RenderLoadUI();
 		}
+
+		if (showImageWindow) {
+			RenderImageGridUI();
+		}
+	}
+
+	void RenderLoadUI() {
+		bool windowOpen = true;
+
+		// Center the window
+		ImGuiIO& io = ImGui::GetIO();
+		ImVec2 center = ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f);
+		ImGui::SetNextWindowPos(center, ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowSize(ImVec2(300, 200), ImGuiCond_FirstUseEver);
+
+		ImGui::Begin("Load folder", &windowOpen,
+			ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking |
+			ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
+
+		// Center the button in the window
+		ImVec2 buttonSize = ImVec2(200, 100);
+		ImVec2 avail = ImGui::GetContentRegionAvail();
+		float centerX = (avail.x - buttonSize.x) * 0.5f;
+		float centerY = (avail.y - buttonSize.y) * 0.5f;
+
+		ImGui::SetCursorPos(ImVec2(centerX, centerY));
+		if (ImGui::Button("Load", buttonSize)) {
+			LoadFolder();
+
+			// Only switch windows if images were loaded
+			if (!g_images.empty()) {
+				showLoadWindow = false;
+				showImageWindow = true;
+			}
+		}
+
 		ImGui::End();
+
+		// Handle window close (X button)
+		if (!windowOpen) {
+			showLoadWindow = false;
+			// TODO: You could exit the application here or show a different window
+		}
+	}
+
+	void RenderImageGridUI() {
+		bool windowOpen = true;
+
+		// Center and size the image window
+		ImGuiIO& io = ImGui::GetIO();
+		ImVec2 center = ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f);
+		ImGui::SetNextWindowPos(center, ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
+
+		ImGui::Begin("Image Grid", &windowOpen,
+			ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking);
+
+		// Add back button
+		if (ImGui::Button("Back to Load")) {
+			showImageWindow = false;
+			showLoadWindow = true;
+		}
+
+		ImGui::Separator();
+		ImGui::Text("Images in folder: %zu", g_images.size());
+
+		if (g_images.empty()) {
+			ImGui::Text("No images loaded.");
+		}
+		else {
+			// Calculate grid layout
+			float windowWidth = ImGui::GetWindowWidth();
+			int imagesPerRow = (int)(windowWidth / 160.0f); // 150px image + 10px padding
+			if (imagesPerRow < 1) imagesPerRow = 1;
+
+			// Display images in grid
+			for (size_t i = 0; i < g_images.size(); ++i) {
+				const ImageData& imgData = g_images[i];
+
+				if (imgData.thumbnailTextureID != 0) {
+					ImGui::PushID((int)i);
+
+					// Make image clickable
+					ImGui::Image((void*)(intptr_t)imgData.thumbnailTextureID,
+						ImVec2(150, 150));
+
+					// Tooltip on hover
+					if (ImGui::IsItemHovered()) {
+						ImGui::BeginTooltip();
+						ImGui::Text("%s", imgData.fileName.c_str());
+						ImGui::EndTooltip();
+					}
+
+					ImGui::PopID();
+
+					// Arrange in grid
+					if ((i + 1) % imagesPerRow != 0 && i < g_images.size() - 1) {
+						ImGui::SameLine();
+					}
+				}
+			}
+		}
+
+		ImGui::End();
+
+		// Handle window close (X button) - go back to load window
+		if (!windowOpen) {
+			showImageWindow = false;
+			showLoadWindow = true;
+		}
 	}
 }

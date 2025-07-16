@@ -106,4 +106,6 @@ void LoadFolder();
 namespace App
 {
     void RenderUI();
+    void RenderLoadUI();
+	void RenderImageGridUI();
 }

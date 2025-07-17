@@ -140,6 +140,12 @@ void LoadFolder() {
 
 	// Scan the selected folder for images
 	for (const auto& entry : std::filesystem::recursive_directory_iterator(g_selectedFolderPath)) {
+
+		if (entry.is_directory() && entry.path() == "/.thumbnails") {
+			continue; 
+		}
+
+		// Check if the entry is a regular file
 		if (entry.is_regular_file()) {
 			std::string file_path = entry.path().string();
 			std::string file_extension = entry.path().extension().string();
@@ -165,9 +171,9 @@ void LoadFolder() {
 				// Check if thumbnail already exists, otherwise generate it
 				if (!std::filesystem::exists(newImage.thumbnailPath)) {
 					std::cout << "Generating thumbnail for: " << newImage.fileName << std::endl;
-					if (!generateThumbnails(newImage.filePath.c_str(), newImage.thumbnailPath.c_str(), 150, 150)) { // Example thumbnail size
+					if (!generateThumbnails(newImage.filePath.c_str(), newImage.thumbnailPath.c_str(), newImage.fullResWidth, newImage.fullResHeight)) {
 						std::cerr << "Failed to generate thumbnail for " << newImage.fileName << std::endl;
-						continue; // Skip this image if thumbnail generation fails
+						continue; 
 					}
 				}
 
@@ -261,14 +267,7 @@ namespace App
 		ImGui::Begin("Image Grid", &windowOpen,
 			ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking);
 
-		// Add back button
-		if (ImGui::Button("Back to Load")) {
-			showImageWindow = false;
-			showLoadWindow = true;
-		}
-
 		ImGui::Separator();
-		ImGui::Text("Images in folder: %zu", g_images.size());
 
 		if (g_images.empty()) {
 			ImGui::Text("No images loaded.");

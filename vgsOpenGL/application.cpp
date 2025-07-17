@@ -28,6 +28,24 @@ std::string g_thumbnailCacheDir;
 std::string g_selectedFolderPath;
 std::vector<ImageData> g_images;
 
+void initializeThumbnailDir() {
+	const char* userProfile = std::getenv("USERPROFILE");
+	if (!userProfile) {
+		std::cerr << "Error: USERPROFILE environment variable not found" << std::endl;
+		g_thumbnailCacheDir = "./thumbnails"; // Fallback local
+		return;
+	}
+
+	try {
+		std::filesystem::path documentsPath = std::filesystem::path(userProfile) / "Documents";
+		g_thumbnailCacheDir = (documentsPath / "VGS_Data" / "thumbnails").string();
+	}
+	catch (const std::filesystem::filesystem_error& e) {
+		std::cerr << "Filesystem error: " << e.what() << std::endl;
+		g_thumbnailCacheDir = "./thumbnails"; // Fallback local
+	}
+}
+
 GLuint generateTexture(unsigned char* pixels, int width, int height, int channels) {
 	if (!pixels || width <= 0 || height <= 0 || channels <= 0) {
 		std::cerr << "Invalid pixel data for texture creation." << std::endl;
@@ -129,10 +147,11 @@ void LoadFolder() {
 	}
 	g_images.clear();
 
+	initializeThumbnailDir();
+
 	// Create a thumbnail cache directory if it doesn't exist
-	g_thumbnailCacheDir = g_selectedFolderPath + "/.thumbnails";
 	if (!std::filesystem::exists(g_thumbnailCacheDir)) {
-		std::filesystem::create_directory(g_thumbnailCacheDir);
+		std::filesystem::create_directories(g_thumbnailCacheDir);
 	}
 
 	// Supported image extensions
@@ -140,10 +159,6 @@ void LoadFolder() {
 
 	// Scan the selected folder for images
 	for (const auto& entry : std::filesystem::recursive_directory_iterator(g_selectedFolderPath)) {
-
-		if (entry.is_directory() && entry.path() == "/.thumbnails") {
-			continue; 
-		}
 
 		// Check if the entry is a regular file
 		if (entry.is_regular_file()) {
@@ -164,6 +179,17 @@ void LoadFolder() {
 				newImage.filePath = file_path;
 				newImage.fileName = entry.path().filename().string();
 				
+				int fullres_width, fullres_height, channels;
+				if (stbi_info(newImage.filePath.c_str(), &fullres_width, &fullres_height, &channels)) {
+					newImage.fullResWidth = fullres_width;
+					newImage.fullResHeight = fullres_height;
+				}
+				int max_width = 300;
+				float aspect_ratio = (float)fullres_height / (float)fullres_width;
+				int thumbnailWidth = max_width;
+				int thumbnailHeight = (int)(max_width * aspect_ratio);
+
+				
 				// Generate thumbnail path
 				std::string thumbnailFileName = newImage.fileName + ".thumb.png";
 				newImage.thumbnailPath = g_thumbnailCacheDir + "/" + thumbnailFileName;
@@ -171,24 +197,24 @@ void LoadFolder() {
 				// Check if thumbnail already exists, otherwise generate it
 				if (!std::filesystem::exists(newImage.thumbnailPath)) {
 					std::cout << "Generating thumbnail for: " << newImage.fileName << std::endl;
-					if (!generateThumbnails(newImage.filePath.c_str(), newImage.thumbnailPath.c_str(), newImage.fullResWidth, newImage.fullResHeight)) {
+					if (!generateThumbnails(newImage.filePath.c_str(), newImage.thumbnailPath.c_str(), thumbnailWidth, thumbnailHeight)) {
 						std::cerr << "Failed to generate thumbnail for " << newImage.fileName << std::endl;
 						continue; 
 					}
 				}
 
 				// Load thumbnail into OpenGL texture immediately
-				int thumbWidth, thumbHeight, thumbChannels;
-				unsigned char* thumbPixels = stbi_load(newImage.thumbnailPath.c_str(), &thumbWidth, &thumbHeight, &thumbChannels, STBI_rgb_alpha);
+				int thumb_Width, thumb_Height, thumb_Channels;
+				unsigned char* thumbPixels = stbi_load(newImage.thumbnailPath.c_str(), &thumb_Width, &thumb_Height, &thumb_Channels, STBI_rgb_alpha);
 				if (thumbPixels) {
-					newImage.thumbnailTextureID = generateTexture(thumbPixels, thumbWidth, thumbHeight, STBI_rgb_alpha);
-					newImage.thumbnailWidth = thumbWidth;
-					newImage.thumbnailHeight = thumbHeight;
+					newImage.thumbnailTextureID = generateTexture(thumbPixels, thumb_Width, thumb_Height, STBI_rgb_alpha);
+					newImage.thumbnailWidth = thumb_Width;
+					newImage.thumbnailHeight = thumb_Height;
 					stbi_image_free(thumbPixels);
 				}
 				else {
 					std::cerr << "Error loading thumbnail for display: " << newImage.thumbnailPath << std::endl;
-					// Optionally, use a placeholder texture if thumbnail loading fails
+					// TODO: Optionally, use a placeholder texture if thumbnail loading fails
 					continue;
 				}
 
@@ -287,7 +313,7 @@ namespace App
 
 					// Make image clickable
 					ImGui::Image((void*)(intptr_t)imgData.thumbnailTextureID,
-						ImVec2(150, 150));
+						ImVec2(imgData.thumbnailWidth, imgData.thumbnailHeight));
 
 					// Tooltip on hover
 					if (ImGui::IsItemHovered()) {

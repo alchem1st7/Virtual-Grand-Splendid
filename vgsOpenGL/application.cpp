@@ -288,10 +288,10 @@ namespace App
 		ImGuiIO& io = ImGui::GetIO();
 		ImVec2 center = ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f);
 		ImGui::SetNextWindowPos(center, ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
-		ImGui::SetNextWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(1920, 1080), ImGuiCond_FirstUseEver);
 
 		ImGui::Begin("Image Grid", &windowOpen,
-			ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking);
+			ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
 
 		ImGui::Separator();
 
@@ -301,36 +301,40 @@ namespace App
 		else {
 			// Calculate grid layout
 			float windowWidth = ImGui::GetWindowWidth();
-			int columns = (int)(windowWidth / 260.0f); // 150px image + 10px padding
+			int column_width = 310;
+			int columns = (int)(windowWidth / column_width);
 			if (columns < 1) columns = 1;
-			int image_per_column = g_images.size() / columns;
-			for (int i = 0, j = 0; i < columns; ++i) {
-				const ImageData& imgData = g_images[j];
+			float column_memory[6];
+			std::fill(column_memory, column_memory + 6, 30.0);
+
+			for (int i = 0, j = 0; i < g_images.size(); i++, j++) {
+				const ImageData& imgData = g_images[i];
 				if (imgData.thumbnailTextureID != 0) {
 					ImGui::PushID(i); // Unique ID for each column
-					ImGui::BeginChild("Column", ImVec2(260, 0)); // Fixed width for each column
-					// Display images in grid
-					for (int k = 0; k < image_per_column && j < g_images.size(); ++k, ++j) {
-						const ImageData& imgData = g_images[j];
-						ImGui::PushID(j); // Unique ID for each image
-						// Make image clickable
-						ImGui::Image((void*)(intptr_t)imgData.thumbnailTextureID,
-							ImVec2(imgData.thumbnailWidth, imgData.thumbnailHeight));
-						// Tooltip on hover
-						if (ImGui::IsItemHovered()) {
-							ImGui::BeginTooltip();
-							ImGui::Text("%s", imgData.fileName.c_str());
-							ImGui::EndTooltip();
-						}
-						ImGui::PopID(); // Pop image ID
+
+					ImGui::SetCursorPos(ImVec2(j * column_width, column_memory[j]));
+
+					// Make image clickable
+					ImGui::Image((void*)(intptr_t)imgData.thumbnailTextureID,
+						ImVec2(imgData.thumbnailWidth, imgData.thumbnailHeight));
+
+					// Tooltip on hover
+					if (ImGui::IsItemHovered()) {
+						ImGui::BeginTooltip();
+						ImGui::Text("%s", imgData.fileName.c_str());
+						ImGui::EndTooltip();
 					}
-					ImGui::EndChild(); // End column child
-					ImGui::SameLine();
-					ImGui::PopID(); // Pop column ID
+
+					ImGui::PopID(); // Pop image ID
+					column_memory[j] += imgData.thumbnailHeight + 10.0f; // 10px padding
+					if (j >= columns - 1) {
+						j = -1; // Reset column index
+						//ImGui::NewLine(); Move to next row
+					}
 				}
 			}
 		}
-
+			
 		ImGui::End();
 
 		// Handle window close (X button) - go back to load window

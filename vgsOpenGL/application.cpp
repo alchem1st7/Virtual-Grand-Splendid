@@ -301,33 +301,32 @@ namespace App
 		else {
 			// Calculate grid layout
 			float windowWidth = ImGui::GetWindowWidth();
-			int imagesPerRow = (int)(windowWidth / 160.0f); // 150px image + 10px padding
-			if (imagesPerRow < 1) imagesPerRow = 1;
-
-			// Display images in grid
-			for (size_t i = 0; i < g_images.size(); ++i) {
-				const ImageData& imgData = g_images[i];
-
+			int columns = (int)(windowWidth / 260.0f); // 150px image + 10px padding
+			if (columns < 1) columns = 1;
+			int image_per_column = g_images.size() / columns;
+			for (int i = 0, j = 0; i < columns; ++i) {
+				const ImageData& imgData = g_images[j];
 				if (imgData.thumbnailTextureID != 0) {
-					ImGui::PushID((int)i);
-
-					// Make image clickable
-					ImGui::Image((void*)(intptr_t)imgData.thumbnailTextureID,
-						ImVec2(imgData.thumbnailWidth, imgData.thumbnailHeight));
-
-					// Tooltip on hover
-					if (ImGui::IsItemHovered()) {
-						ImGui::BeginTooltip();
-						ImGui::Text("%s", imgData.fileName.c_str());
-						ImGui::EndTooltip();
+					ImGui::PushID(i); // Unique ID for each column
+					ImGui::BeginChild("Column", ImVec2(260, 0)); // Fixed width for each column
+					// Display images in grid
+					for (int k = 0; k < image_per_column && j < g_images.size(); ++k, ++j) {
+						const ImageData& imgData = g_images[j];
+						ImGui::PushID(j); // Unique ID for each image
+						// Make image clickable
+						ImGui::Image((void*)(intptr_t)imgData.thumbnailTextureID,
+							ImVec2(imgData.thumbnailWidth, imgData.thumbnailHeight));
+						// Tooltip on hover
+						if (ImGui::IsItemHovered()) {
+							ImGui::BeginTooltip();
+							ImGui::Text("%s", imgData.fileName.c_str());
+							ImGui::EndTooltip();
+						}
+						ImGui::PopID(); // Pop image ID
 					}
-
-					ImGui::PopID();
-
-					// Arrange in grid
-					if ((i + 1) % imagesPerRow != 0 && i < g_images.size() - 1) {
-						ImGui::SameLine();
-					}
+					ImGui::EndChild(); // End column child
+					ImGui::SameLine();
+					ImGui::PopID(); // Pop column ID
 				}
 			}
 		}
